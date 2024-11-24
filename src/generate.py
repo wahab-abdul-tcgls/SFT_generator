@@ -110,10 +110,9 @@ def generate_claude_code(template_dir, user_instructions):
     user_prompt_code = select_random_template(template_dir)
 
     model_id = 'anthropic.claude-v2'
-    system_prompt = 'You are an intelligent Python code assistant.'
     
     # Combine system prompt, user instructions, and user-provided code
-    prompt = f"{system_prompt}\n\nHuman: {user_instructions}\n\n{user_prompt_code}\n\nAssistant:"
+    prompt = f"{user_instructions}\n{user_prompt_code}"
     
     body = {
         "prompt": prompt,
@@ -166,39 +165,46 @@ def generate_claude_code(template_dir, user_instructions):
 #     return response
 
 
-# def generate_mixtral_code(content, title):
-#     model_id = "mistral.mixtral-8x7b-instruct-v0:1"
-#     system_prompt = f"""You are an intelligent content summarizer. Strictly provide response in JSON format. Your task is to analyze the content titled '{title}' and generate the following:
+def generate_mixtral_code(template_dir, user_instructions):
+    model_id = "mistral.mixtral-8x7b-instruct-v0:1"
 
-#     1. 'summary': A concise summary of the content without personal commentary or opinion in no more than 100 words.
-#     2. 'title': A creative title for the content.
-
-#     Generate a valid JSON with the keys 'summary' and 'title'."""
-#     formatted_prompt = f"<s>[INST] {system_prompt}\n content : {content}[/INST]"
+    # Select a random template
+    user_prompt_code = select_random_template(template_dir)
     
-#     native_request = {
-#         "prompt": formatted_prompt,
-#         "max_tokens": 4096,
-#         "temperature": 0.8,
-#     }
+    # Combine system prompt, user instructions, and user-provided code
+    prompt = f"{user_instructions}\n{user_prompt_code}"
+    
+    native_request = {
+        "prompt": prompt,
+        "max_tokens": 4096,
+        "temperature": 0.8,
+    }
 
-#     request = json.dumps(native_request)
+    request = json.dumps(native_request)
 
-#     try:
-#         # Invoke the model with the request.
-#         response = client.invoke_model(modelId=model_id, body=request)
-#         model_response = json.loads(response["body"].read())
-#         response_text = model_response["outputs"][0]["text"]
+    try:
+        # Invoke the model with the request.
+        response = client.invoke_model(modelId=model_id, body=request)
+        model_response = json.loads(response["body"].read())
+        response_text = model_response["outputs"][0]["text"]
 
-#         # Parse the JSON response
-#         response_data = json.loads(response_text)
-
-#         # Extract summary and title, handling missing keys
-#         summary = response_data.get("summary", "Summary not found.")
-#         title = response_data.get("title", "Title not found.")
+        # Prepare the results folder
+        timestamp = datetime.now().strftime('%d %B')  # Format: 25 November
+        results_base = os.path.join('results', timestamp)
+        code_dir = os.path.join(results_base, 'code')
+        charts_dir = os.path.join(results_base, 'charts')
         
-#         return summary, title
+        # Save the generated code
+        script_path = save_generated_code(response_text, code_dir)
 
-#     except (ClientError, Exception, json.JSONDecodeError) as e:
-#         print(f"ERROR: Can't invoke '{model_id}' or parse response. Reason: {e}")
-#         return "Summary generation failed.", "Title generation failed."
+        subprocess.run(['python', script_path], check=True)
+        print(f"Charts saved in: {charts_dir}")
+
+    except subprocess.CalledProcessError as e:
+        print(f"Error executing the generated script: {e}")
+        
+        return response_text
+
+    except (ClientError, Exception, json.JSONDecodeError) as e:
+        print(f"ERROR: Can't invoke '{model_id}' or parse response. Reason: {e}")
+        return "Summary generation failed.", "Title generation failed."
